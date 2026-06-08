@@ -1,4 +1,8 @@
 import { supabaseAdmin } from "@/lib/supabase";
+
+// Força renderização dinâmica — busca dados frescos a cada request
+export const dynamic = "force-dynamic";
+
 const supabase = supabaseAdmin();
 
 type Jogo = {
