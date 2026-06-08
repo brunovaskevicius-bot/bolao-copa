@@ -1,4 +1,5 @@
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
+const supabase = supabaseAdmin();
 
 type Jogo = {
   id: string;

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
 
 type PalpiteComJogo = {
   id: string;
@@ -32,67 +31,15 @@ type DadosDashboard = {
 };
 
 async function buscarDados(nome: string): Promise<DadosDashboard | null> {
-  // Busca participante
-  const { data: part } = await supabase
-    .from("participantes")
-    .select("id")
-    .ilike("nome", `%${nome}%`)
-    .limit(5);
-
-  if (!part || part.length === 0) return null;
-
-  // Pega o mais próximo do nome digitado
-  const participanteId = part[0].id;
-
-  // Busca palpites com dados do jogo
-  const { data: palpites } = await supabase
-    .from("palpites")
-    .select(`
-      id, palpite1, palpite2, pontos,
-      jogos (
-        id, time1, time2, bandeira1, bandeira2,
-        data_jogo, gols1_real, gols2_real, apurado
-      )
-    `)
-    .eq("participante_id", participanteId)
-    .order("created_at", { ascending: false });
-
-  const lista = (palpites ?? []) as unknown as PalpiteComJogo[];
-
-  const apurados     = lista.filter((p) => p.jogos?.apurado);
-  const pontos       = apurados.reduce((s, p) => s + (p.pontos ?? 0), 0);
-  const acertos      = apurados.filter((p) => (p.pontos ?? 0) > 0).length;
-
-  // Histórico por dia (últimos 7 dias com jogo)
-  const porDia: Record<string, number> = {};
-  for (const p of apurados) {
-    if (!p.jogos?.data_jogo) continue;
-    const dia = new Date(p.jogos.data_jogo).toLocaleDateString("pt-BR", {
-      timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit",
-    });
-    porDia[dia] = (porDia[dia] ?? 0) + (p.pontos ?? 0);
-  }
-  const historico = Object.entries(porDia)
-    .slice(-7)
-    .map(([dia, pts]) => ({ dia, pontos: pts }));
-
-  return {
-    participanteId,
-    pontos,
-    acertos,
-    jogosApurados: apurados.length,
-    palpites: lista,
-    historico,
-  };
+  const res = await fetch(`/api/meus-palpites?nome=${encodeURIComponent(nome)}`);
+  if (!res.ok) return null;
+  return res.json();
 }
 
 async function buscarNomes(termo: string): Promise<string[]> {
-  const { data } = await supabase
-    .from("participantes")
-    .select("nome")
-    .ilike("nome", `%${termo}%`)
-    .limit(5);
-  return (data ?? []).map((p: { nome: string }) => p.nome);
+  const res = await fetch(`/api/participantes?q=${encodeURIComponent(termo)}`);
+  if (!res.ok) return [];
+  return res.json();
 }
 
 // ---- Página principal ----
