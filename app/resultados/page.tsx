@@ -1,123 +1,170 @@
-const mockResultados = [
-  {
-    data: "08/06",
-    fase: "Grupos — Fase 3",
-    time1: { nome: "Brasil", bandeira: "🇧🇷", gols: 3 },
-    time2: { nome: "Sérvia", bandeira: "🇷🇸", gols: 1 },
-  },
-  {
-    data: "07/06",
-    fase: "Grupos — Fase 3",
-    time1: { nome: "Argentina", bandeira: "🇦🇷", gols: 2 },
-    time2: { nome: "México", bandeira: "🇲🇽", gols: 2 },
-  },
-  {
-    data: "07/06",
-    fase: "Grupos — Fase 3",
-    time1: { nome: "França", bandeira: "🇫🇷", gols: 1 },
-    time2: { nome: "Polônia", bandeira: "🇵🇱", gols: 0 },
-  },
-  {
-    data: "06/06",
-    fase: "Grupos — Fase 3",
-    time1: { nome: "Portugal", bandeira: "🇵🇹", gols: 4 },
-    time2: { nome: "Marrocos", bandeira: "🇲🇦", gols: 2 },
-  },
-  {
-    data: "05/06",
-    fase: "Grupos — Fase 3",
-    time1: { nome: "Alemanha", bandeira: "🇩🇪", gols: 2 },
-    time2: { nome: "Japão", bandeira: "🇯🇵", gols: 1 },
-  },
-  {
-    data: "04/06",
-    fase: "Grupos — Fase 2",
-    time1: { nome: "Inglaterra", bandeira: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", gols: 3 },
-    time2: { nome: "EUA", bandeira: "🇺🇸", gols: 0 },
-  },
-];
+import { supabase } from "@/lib/supabase";
 
-function Placar({ gols1, gols2 }: { gols1: number; gols2: number }) {
-  const empate = gols1 === gols2;
-  const vitoria1 = gols1 > gols2;
-  return (
-    <div className="flex items-center gap-2 text-xl font-bold">
-      <span className={vitoria1 ? "text-green-700" : empate ? "text-slate-500" : "text-slate-400"}>
-        {gols1}
-      </span>
-      <span className="text-slate-300 text-base">×</span>
-      <span className={!vitoria1 && !empate ? "text-green-700" : empate ? "text-slate-500" : "text-slate-400"}>
-        {gols2}
-      </span>
-    </div>
-  );
+type Jogo = {
+  id: string;
+  numero_jogo: number;
+  fase: string;
+  time1: string;
+  time2: string;
+  bandeira1: string | null;
+  bandeira2: string | null;
+  data_jogo: string;
+  gols1_real: number | null;
+  gols2_real: number | null;
+  apurado: boolean;
+};
+
+function formatarData(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleDateString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+  });
 }
 
-export default function ResultadosPage() {
-  const hoje = mockResultados.filter((r) => r.data === "08/06");
-  const anteriores = mockResultados.filter((r) => r.data !== "08/06");
+function formatarHora(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleTimeString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function faseLabel(fase: string) {
+  const map: Record<string, string> = {
+    grupos:   "Fase de Grupos",
+    oitavas:  "Oitavas de Final",
+    quartas:  "Quartas de Final",
+    semi:     "Semifinal",
+    terceiro: "3º Lugar",
+    final:    "Final",
+  };
+  return map[fase] ?? fase;
+}
+
+export default async function ResultadosPage() {
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+
+  // Busca jogos apurados (últimos 10) + próximos 10 jogos
+  const [{ data: apurados }, { data: proximos }] = await Promise.all([
+    supabase
+      .from("jogos")
+      .select("*")
+      .eq("apurado", true)
+      .order("data_jogo", { ascending: false })
+      .limit(10),
+    supabase
+      .from("jogos")
+      .select("*")
+      .eq("apurado", false)
+      .gte("data_jogo", hoje.toISOString())
+      .order("data_jogo", { ascending: true })
+      .limit(10),
+  ]);
+
+  const semResultados = !apurados || apurados.length === 0;
+  const semProximos   = !proximos  || proximos.length  === 0;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
-      {/* Hoje */}
-      {hoje.length > 0 && (
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wide">Hoje</h2>
+
+      {/* Resultados recentes */}
+      <section className="mb-8">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="w-2 h-2 rounded-full bg-green-500" />
+          <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wide">
+            Resultados recentes
+          </h2>
+        </div>
+
+        {semResultados ? (
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm px-5 py-8 text-center">
+            <p className="text-3xl mb-2">⏳</p>
+            <p className="text-sm text-slate-500">
+              Nenhum jogo apurado ainda. A Copa começa em 11/06!
+            </p>
           </div>
+        ) : (
           <div className="flex flex-col gap-3">
-            {hoje.map((jogo, i) => (
-              <JogoCard key={i} jogo={jogo} destaque />
+            {(apurados as Jogo[]).map((j) => (
+              <JogoCard key={j.id} jogo={j} apurado />
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </section>
 
-      {/* Anteriores */}
-      <div>
-        <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-3">
-          Jogos anteriores
-        </h2>
-        <div className="flex flex-col gap-3">
-          {anteriores.map((jogo, i) => (
-            <JogoCard key={i} jogo={jogo} />
-          ))}
+      {/* Próximos jogos */}
+      <section>
+        <div className="flex items-center gap-2 mb-3">
+          <span className="w-2 h-2 rounded-full bg-slate-300" />
+          <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wide">
+            Próximos jogos
+          </h2>
         </div>
-      </div>
+
+        {semProximos ? (
+          <p className="text-sm text-slate-400 text-center py-4">
+            Nenhum jogo agendado.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {(proximos as Jogo[]).map((j) => (
+              <JogoCard key={j.id} jogo={j} apurado={false} />
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
 
-type Jogo = (typeof mockResultados)[0];
-
-function JogoCard({ jogo, destaque = false }: { jogo: Jogo; destaque?: boolean }) {
+function JogoCard({ jogo, apurado }: { jogo: Jogo; apurado: boolean }) {
   return (
-    <div
-      className={`bg-white rounded-xl border shadow-sm px-5 py-4 ${
-        destaque ? "border-green-200 ring-1 ring-green-100" : "border-slate-100"
-      }`}
-    >
+    <div className={`bg-white rounded-xl border shadow-sm px-5 py-4 ${
+      apurado ? "border-slate-100" : "border-slate-100 opacity-80"
+    }`}>
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs text-slate-400">{jogo.data} · {jogo.fase}</span>
-        {destaque && (
+        <span className="text-xs text-slate-400">
+          {formatarData(jogo.data_jogo)} · {formatarHora(jogo.data_jogo)} · {faseLabel(jogo.fase)}
+        </span>
+        {apurado && (
           <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
-            Apurado hoje
+            Encerrado
           </span>
         )}
       </div>
-      <div className="flex items-center justify-between">
+
+      <div className="flex items-center justify-between gap-2">
         {/* Time 1 */}
         <div className="flex items-center gap-2 flex-1">
-          <span className="text-2xl">{jogo.time1.bandeira}</span>
-          <span className="font-semibold text-slate-800 text-sm">{jogo.time1.nome}</span>
+          {jogo.bandeira1 && <span className="text-2xl">{jogo.bandeira1}</span>}
+          <span className="font-semibold text-slate-800 text-sm">{jogo.time1}</span>
         </div>
-        {/* Placar */}
-        <Placar gols1={jogo.time1.gols} gols2={jogo.time2.gols} />
+
+        {/* Placar ou horário */}
+        {apurado ? (
+          <div className="flex items-center gap-2 text-xl font-bold shrink-0">
+            <span className={jogo.gols1_real! > jogo.gols2_real! ? "text-green-700" : "text-slate-400"}>
+              {jogo.gols1_real}
+            </span>
+            <span className="text-slate-300 text-base">×</span>
+            <span className={jogo.gols2_real! > jogo.gols1_real! ? "text-green-700" : "text-slate-400"}>
+              {jogo.gols2_real}
+            </span>
+          </div>
+        ) : (
+          <div className="text-sm font-semibold text-slate-400 shrink-0">
+            {formatarHora(jogo.data_jogo)}
+          </div>
+        )}
+
         {/* Time 2 */}
         <div className="flex items-center gap-2 flex-1 justify-end">
-          <span className="font-semibold text-slate-800 text-sm">{jogo.time2.nome}</span>
-          <span className="text-2xl">{jogo.time2.bandeira}</span>
+          <span className="font-semibold text-slate-800 text-sm">{jogo.time2}</span>
+          {jogo.bandeira2 && <span className="text-2xl">{jogo.bandeira2}</span>}
         </div>
       </div>
     </div>
