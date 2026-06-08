@@ -3,8 +3,6 @@ import { supabaseAdmin } from "@/lib/supabase";
 // Força renderização dinâmica — busca dados frescos a cada request
 export const dynamic = "force-dynamic";
 
-const supabase = supabaseAdmin();
-
 type Jogo = {
   id: string;
   numero_jogo: number;
@@ -50,18 +48,20 @@ function faseLabel(fase: string) {
 }
 
 export default async function ResultadosPage() {
+  // Cria o cliente dentro da função — garante env vars disponíveis no Vercel
+  const db = supabaseAdmin();
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
 
   // Busca jogos apurados (últimos 10) + próximos 10 jogos
   const [{ data: apurados }, { data: proximos }] = await Promise.all([
-    supabase
+    db
       .from("jogos")
       .select("*")
       .eq("apurado", true)
       .order("data_jogo", { ascending: false })
       .limit(10),
-    supabase
+    db
       .from("jogos")
       .select("*")
       .eq("apurado", false)
