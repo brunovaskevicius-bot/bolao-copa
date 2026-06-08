@@ -1,14 +1,15 @@
 import { createClient } from "@supabase/supabase-js";
 
-const url  = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// Inicialização lazy — evita falha de build quando as env vars ainda não estão configuradas
+function getUrl()  { return process.env.NEXT_PUBLIC_SUPABASE_URL  ?? "https://placeholder.supabase.co"; }
+function getAnon() { return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "placeholder"; }
 
 // Cliente público (browser) — usa a anon key
-export const supabase = createClient(url, anon);
+export const supabase = createClient(getUrl(), getAnon());
 
 // Cliente server-side com service role (para mutations seguras em API routes)
 export function supabaseAdmin() {
-  return createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  return createClient(getUrl(), process.env.SUPABASE_SERVICE_ROLE_KEY ?? "placeholder", {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }
